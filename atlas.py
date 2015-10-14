@@ -6,13 +6,6 @@ import threading
 import speech_recognition as sr
 from speech_recognition import UnknownValueError
 
-# Print ATLAS
-ATLAS = open('ATLAS.txt','r')
-for line in ATLAS:
-    print(line)
-
-ATLAS.close()
-
 # Initialization
 r = sr.Recognizer()
 logging.basicConfig(level=logging.DEBUG,
