@@ -4,7 +4,6 @@ import time
 import logging
 import threading
 import speech_recognition as sr
-from speech_recognition import UnknownValueError
 
 # Initialization
 r = sr.Recognizer()
@@ -36,7 +35,7 @@ def listen():
         print("Set minimum energy threshold to {}".format(r.energy_threshold))
         try:
             audio = r.listen(source, MAX_WAIT)  # listen for the first phrase and extract it into audio data
-        except:  # TODO: catch TimeoutError, a type of OSError
+        except (sr.UnknownValueError, sr.WaitTimeoutError):  # TODO: catch TimeoutError, a type of OSError
             logging.debug("Timeout exception")
             return None
     try:
@@ -45,7 +44,6 @@ def listen():
         logging.debug("You said {}".format(value))
     except LookupError:  # speech is unintelligible
         logging.debug("Oops! Didn't catch that")
-        return False
 
     return value
 
@@ -59,7 +57,11 @@ def listen_for_phrases(timeouts=0):
             logging.debug("    '%s'" % phrase)
 
         # Listen for phrase
-        user_said = listen()
+        try:
+            user_said = listen()
+        except (sr.UnknownValueError, sr.WaitTimeoutError):
+            print('Speech Recognition error...')
+            continue
         if user_said is None:
             timeouts += 1  # record timeout
             continue
@@ -123,13 +125,17 @@ def await_commands():
             if res is None or len(res) == 0:
                 continue
             res = res.lower()
-        except:
+        except (sr.UnknownValueError, sr.WaitTimeoutError):
             print('Unknonw value error raised from speech_recognition')
+            continue
         if "atlas" in res or 'alice' in res:
             # threading.Thread(name="say", args=["Yes?"], target=say).start()
             # time.sleep(2)
             # say("Yes?")
-            listen_for_phrases()
+            try:
+                listen_for_phrases()
+            except:
+                print('Unknonw value error raised from speech_recognition while listening for phrases.')
 
 
 ##########################
