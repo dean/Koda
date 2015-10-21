@@ -1,40 +1,23 @@
-# Atlas
-#### The Iron-Man-inspired voice controlled operating system
+# Koda 
+#### Home automation assistant for Music, Downloads and more.
 
-Running Atlas:
+Running Koda:
 
-    python atlas.py
+    python3 koda.py
 
 Playing music:
 
-    "Atlas"
-    * wait for Atlas to respond *
-    "Time to program"
+    "Koda"
+    "play <title> by <artist>"
 
 Stopping music:
 
-    "Atlas"
-    * wait for Atlas to respond *
-    "Stop the music"
+    "Koda"
+    "stop the music"
     
-Powering off:
-
-    "Atlas"
-    * wait for Atlas to respond *
-    "Power off"
-
-## Screenshot
-
-![ATLAS](https://i.imgur.com/TZWadtI.png)
-
-## Requirements
-
-Atlas relies on Google's speech recognition and TTS APIs:
+Koda relies on Google's speech recognition and TTS APIs:
 * [SpeechRecognition 1.5.0](https://pypi.python.org/pypi/SpeechRecognition/)
-* [gTTS 1.0.2](https://pypi.python.org/pypi/gTTS/1.0.2)
 
 For a quick install, run:
 
-    pip install SpeechRecognition gTTS
-
-
+    pip install SpeechRecognition
