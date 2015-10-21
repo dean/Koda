@@ -4,6 +4,7 @@ import functools
 import glob
 import logging
 import os
+import random
 import re
 import subprocess
 import sys
@@ -27,29 +28,17 @@ def clean(string, chars=list('.()-_')):
     return functools.reduce(lambda original, ignore: original.replace(ignore, ''),
                   [string] + chars)
 
-music_locked = False
-# Play programming music
-def play_music(fname):
-    global music_locked
-    print(fname)
-    music_locked = True
-    reset()
-    logging.debug("Starting mpg321")
-    subprocess.check_call(['mpg321', fname, '--quiet'])
-    logging.debug("Finished mpg321")
-    music_locked = False
-    return
-
-
 # Stop programming music
-def stop_music():
-    global music_locked
+def stop_the_music():
+    clear_matches(STOP_MUSIC_RE)
     logging.debug("Killing mpg321")
-    reset()
-    music_locked = False
-    subprocess.check_call(['killall', 'mpg321'])
-    logging.debug("Killed mpg321")
-    return
+    try:
+        subprocess.check_call(['killall', 'mpg321'])
+    except subprocess.CalledProcessError:
+        pass
+    finally:
+        logging.debug("Killed mpg321")
+        return
 
 
 def any_matches(_spoken, triggers):
@@ -60,17 +49,13 @@ def any_matches(_spoken, triggers):
                 matches.append(i)
     return matches
 
-def reset():
-    global atlas
-    clear_matches(triggers)
-    atlas = False
 
-
-def clear_matches(triggers):
+def clear_matches(_re):
     global spoken
-    matches = any_matches(spoken, triggers)
-    for index in matches:
-        spoken[index] = ''
+    for i, spoke in enumerate(spoken):
+        matches = re.match(_re, spoke, flags=re.I)
+        if matches:
+            spoken[i] = ''
 
 def parse_title_artist(s):
     s = s.lower()
@@ -80,87 +65,129 @@ def parse_title_artist(s):
     return split
 
 def _download(title, artist):
-    global download_locked
-    download_locked = True
+    global lock
+    if lock.get('download'):
+        return
+
+    lock['download']= True
+    clear_matches(DOWNLOAD_RE)
     with open('../YoutubeDownloaderClient/songs.txt', 'w') as f:
         f.write('{0} --- {1}'.format(title, artist))
     res = os.system('cd ../YoutubeDownloaderClient && source env/bin/activate && python download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
     if res == 0:
         logging.debug('Attempting to download {0} by {1} to {2}'.format(title, artist, '../YoutubeDownloader/downloads/{0} --- {1}'.format(artist, title)))
-    clear_matches(['download'])
-    download_locked = False
+    lock['download']= False
+    return
+
+
+
+
+lock = {}
+def _play_music(title, artist):
+    global lock
+
+    filename = get_filename(title, artist)
+    if not filename or lock.get('play_music'):
+        return
+
+    lock['play music'] = True
+    clear_matches(MUSIC_RE)
+    logging.debug("Playing {path}".format(path=filename))
+    try:
+        subprocess.check_call(['mpg321', filename, '--quiet'])
+        logging.debug("Stopping mpg321")
+    except subprocess.CalledProcessError:
+        logging.debug('mpg321 killed.')
+    finally:
+        lock['play music'] = False
+        return
 
 
 atlas = False
 download_locked = False
 # Listen for particular phrases
 def listen_for_phrases():
-    global atlas
+    global lock
     global spoken
     time_heard = None
     r = 1
     while(True):
         time.sleep(0.15)  # So we don't do millions of iterations in succession...
         matches = any_matches(spoken, triggers)
-        if not atlas and matches:
+        if not lock.get('atlas') and matches:
+            for i in matches:
+                spoken[i] = ''
             print(matches)
             print(spoken)
             print('Triggered!')
             subprocess.check_call(['mpg321', 'alert.mp3'])
             time_heard = datetime.datetime.now()
-            atlas = True
+            lock['atlas'] = True
 
-        if atlas and (datetime.datetime.now() - time_heard).seconds >= 10:
+        if lock.get('atlas') and (datetime.datetime.now() - time_heard).seconds >= 10:
             print('Resetting...')
-            reset()
+            lock['atlas'] = False
+            # reset()
 
         # PHRASE
-        if not atlas:
+        if not lock.get('atlas'):
             continue
 
+        phrases = {re.compile(regex, flags=re.I): func for regex, func in keyword_expressions.items()}
+
         for i, user_said in enumerate(spoken):
-            if user_said.lower().startswith("play "):
-                spoken[i] = ''
-                value = user_said[4:]
-                if not music_locked:
-                    filename = get_filename(value)
-                    if not filename:
-                        continue
-                    threading.Thread(name='play_music', target=play_music, args=(filename,)).start()
-                    logging.debug("'play_music' thread issued")
-                else:
-                    print('Locked from playing music.')
-
-            if user_said.lower().startswith("download "):
-                spoken[i] = ''
-                value = user_said[9:]
-                title, artist = parse_title_artist(value)
-                if not download_locked:
-                   threading.Thread(name='Download', target=_download, args=(title, artist)).start()
+            for _re, func in phrases.items():
+                match = _re.match(user_said)
+                if match and match.groups():
+                    print('Matched on %s' % user_said)
+                    threading.Thread(target=func, args=match.groups()).start()
+                elif match:
+                    print('Matched on %s' % user_said)
+                    threading.Thread(target=func).start()
 
 
-            # PHRASE
-            elif user_said.lower() == "stop the music":
-                spoken[i] = ''
-                threading.Thread(name='stop_music', target=stop_music).start()
-                logging.debug("'stop_music' thread issued")
-                clear_all(['stop the music'])
+            #if user_said.lower().startswith("play "):
+            #    spoken[i] = ''
+            #    value = user_said[4:]
+            #    if not music_locked:
+            #        filename = get_filename(value)
+            #        if not filename:
+            #            continue
+            #        threading.Thread(name='play_music', target=play_music, args=(filename,)).start()
+            #        logging.debug("'play_music' thread issued")
+            #    else:
+            #        print('Locked from playing music.')
+
+            #if user_said.lower().startswith("download "):
+            #    spoken[i] = ''
+            #    value = user_said[9:]
+            #    title, artist = parse_title_artist(value)
+            #    if not download_locked:
+            #       threading.Thread(name='Download', target=_download, args=(title, artist)).start()
 
 
-def get_filename(song_info):
-    info = song_info.split(' by ')
-    if len(info) == 1:
-        info = song_info.split(' By ')
-        if len(info) == 1:
-            print('Error, could not parse %s' % (song_info))
-            return ''
-    print(info)
-    title, artist = map(lambda item: item.strip(), info)
+            ## PHRASE
+            #elif user_said.lower() == "stop the music":
+            #    spoken[i] = ''
+            #    threading.Thread(name='stop_music', target=stop_music).start()
+            #    logging.debug("'stop_music' thread issued")
+            #    clear_all(['stop the music'])
+
+
+def get_filename(title, artist):
+    title, artist = title.lower().strip(), artist.lower().strip()
     print(title, artist)
     init_path = '/Users/dean/Programming/YoutubeDownloaderClient/downloads/'
     songs = os.listdir(init_path)
-    songs = filter(lambda song: song.lower().startswith(artist.lower()), songs)
-    matches = filter(lambda s: title.lower() in clean(s.lower()), songs)
+    songs = filter(lambda song: song.lower().startswith(artist), songs)
+    songs = list(songs)
+
+    if title == 'something':
+        if not songs:
+            return
+        return os.path.join(init_path, random.choice(songs))
+
+    matches = filter(lambda s: title in clean(s.lower()), songs)
     x = list(matches)
     print(x)
     if len(x) > 0:
@@ -201,6 +228,14 @@ def listen(index):
             return
     return
 
+MUSIC_RE = r'play (.+) by (.+)'
+DOWNLOAD_RE = r'download (.+) by (.+)'
+STOP_MUSIC_RE = r'stop(?: the)? music'
+keyword_expressions = {
+    MUSIC_RE: _play_music,
+    DOWNLOAD_RE: _download,
+    STOP_MUSIC_RE: stop_the_music,
+}
 
 if __name__ == "__main__":
     await_commands()
