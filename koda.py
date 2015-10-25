@@ -17,7 +17,16 @@ import speech_recognition as sr
 r = sr.Recognizer()
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
-triggers = ['atlas', 'alice', 'outlet']
+triggers = ['coda', 'koda', 'cota', 'toyota', 'tota']
+
+def capitalize(string):
+    if not string:
+        return ''
+    f = string[0]
+    minimum, maximum = ord('A'), ord('a')
+    if minimum <= ord(f) < maximum:
+        return string
+    return chr(ord(f) - (maximum - minimum)) + string[1:]
 
 
 def clean(string, chars=list('.()-_')):
@@ -30,7 +39,6 @@ def clean(string, chars=list('.()-_')):
 
 # Stop programming music
 def stop_the_music():
-    clear_matches(STOP_MUSIC_RE)
     logging.debug("Killing mpg321")
     try:
         subprocess.check_call(['killall', 'mpg321'])
@@ -70,7 +78,8 @@ def _download(title, artist):
         return
 
     lock['download']= True
-    clear_matches(DOWNLOAD_RE)
+    title = ' '.join(map(capitalize, title.split(' ')))
+    artist = ' '.join(map(capitalize, artist.split(' ')))
     with open('../YoutubeDownloaderClient/songs.txt', 'w') as f:
         f.write('{0} --- {1}'.format(title, artist))
     res = os.system('cd ../YoutubeDownloaderClient && source env/bin/activate && python download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
@@ -80,27 +89,45 @@ def _download(title, artist):
     return
 
 
-
-
 lock = {}
 def _play_music(title, artist):
     global lock
 
-    filename = get_filename(title, artist)
-    if not filename or lock.get('play_music'):
+    filename = get_filename(title=title, artist=artist)
+    if not filename or lock.get('play music'):
         return
 
     lock['play music'] = True
-    clear_matches(MUSIC_RE)
     logging.debug("Playing {path}".format(path=filename))
-    try:
-        subprocess.check_call(['mpg321', filename, '--quiet'])
-        logging.debug("Stopping mpg321")
-    except subprocess.CalledProcessError:
-        logging.debug('mpg321 killed.')
-    finally:
-        lock['play music'] = False
-        return
+    #try:
+    subprocess.check_call(['mpg321', filename, '--quiet'])
+    logging.debug("Stopping mpg321")
+    #except subprocess.CalledProcessError:
+    logging.debug('mpg321 killed.')
+    #finally:
+    lock['play music'] = False
+    return
+
+
+def _play_something_music(artist):
+    global lock
+
+    while True:
+        filename = get_filename(artist=artist)
+        if not filename or lock.get('play music'):
+            return
+
+        lock['play music'] = True
+        logging.debug("Playing {path}".format(path=filename))
+        try:
+            subprocess.check_call(['mpg321', filename, '--quiet'])
+            logging.debug("Stopping mpg321")
+        except subprocess.CalledProcessError:
+            logging.debug('mpg321 killed.')
+            return
+        finally:
+            lock['play music'] = False
+
 
 
 atlas = False
@@ -141,52 +168,25 @@ def listen_for_phrases():
                 if match and match.groups():
                     print('Matched on %s' % user_said)
                     threading.Thread(target=func, args=match.groups()).start()
+                    clear_matches(_re.pattern)
                 elif match:
                     print('Matched on %s' % user_said)
                     threading.Thread(target=func).start()
+                    clear_matches(_re.pattern)
 
-
-            #if user_said.lower().startswith("play "):
-            #    spoken[i] = ''
-            #    value = user_said[4:]
-            #    if not music_locked:
-            #        filename = get_filename(value)
-            #        if not filename:
-            #            continue
-            #        threading.Thread(name='play_music', target=play_music, args=(filename,)).start()
-            #        logging.debug("'play_music' thread issued")
-            #    else:
-            #        print('Locked from playing music.')
-
-            #if user_said.lower().startswith("download "):
-            #    spoken[i] = ''
-            #    value = user_said[9:]
-            #    title, artist = parse_title_artist(value)
-            #    if not download_locked:
-            #       threading.Thread(name='Download', target=_download, args=(title, artist)).start()
-
-
-            ## PHRASE
-            #elif user_said.lower() == "stop the music":
-            #    spoken[i] = ''
-            #    threading.Thread(name='stop_music', target=stop_music).start()
-            #    logging.debug("'stop_music' thread issued")
-            #    clear_all(['stop the music'])
-
-
-def get_filename(title, artist):
-    title, artist = title.lower().strip(), artist.lower().strip()
+def get_filename(title=None, artist=None):
+    artist = artist.lower().strip()
     print(title, artist)
     init_path = '/Users/dean/Programming/YoutubeDownloaderClient/downloads/'
     songs = os.listdir(init_path)
     songs = filter(lambda song: song.lower().startswith(artist), songs)
     songs = list(songs)
 
-    if title == 'something':
+    if not title:
         if not songs:
-            return
+            return ''
         return os.path.join(init_path, random.choice(songs))
-
+    title = title.lower().strip()
     matches = filter(lambda s: title in clean(s.lower()), songs)
     x = list(matches)
     print(x)
@@ -195,22 +195,21 @@ def get_filename(title, artist):
     print('Error... unable to parse from songs: {0}'.format(list(songs)))
     return ''
 
-spoken = [''] * 5
-# Await 'Atlas' phrase
+spoken = [''] * 25
 def await_commands():
     threading.Thread(name='Listen for phrases', target=listen_for_phrases).start()
+    i = 1
     while(True):
-        # Spawn 25 threads that each last for 5 seconds (MAX_WAIT) .2 seconds apart from eachother.
-        for i in range(5):
-            threading.Thread(name='Listener%d' % i, target=listen, args=(i,)).start()
-            time.sleep(3)
+        threading.Thread(name='Listener%d' % (i % 7), target=listen, args=(i % 7,)).start()
+        time.sleep(2)
+        i += 1
 
 
 
 # Speech to text
 def listen(index):
     global spoken
-    MAX_WAIT = index + 3  # seconds
+    MAX_WAIT = index + 5  # seconds
     logging.debug("Listening...")
     with sr.Microphone() as source:  # use the default microphone as the audio source
         try:
@@ -224,15 +223,17 @@ def listen(index):
                 spoken[index] = value
         except (sr.UnknownValueError, sr.WaitTimeoutError, LookupError):  # speech is unintelligible
             # logging.debug("Oops! Didn't catch that or timed out.")
-            pass
+            spoken[index] = ''
             return
     return
 
 MUSIC_RE = r'play (.+) by (.+)'
+MUSIC_SOMETHING_RE = r'play something by (.+)'
 DOWNLOAD_RE = r'download (.+) by (.+)'
 STOP_MUSIC_RE = r'stop(?: the)? music'
 keyword_expressions = {
     MUSIC_RE: _play_music,
+    MUSIC_SOMETHING_RE: _play_something_music,
     DOWNLOAD_RE: _download,
     STOP_MUSIC_RE: stop_the_music,
 }
