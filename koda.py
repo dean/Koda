@@ -1,7 +1,5 @@
 import datetime
-import fnmatch
 import functools
-import glob
 import logging
 import os
 import random
@@ -17,7 +15,7 @@ import speech_recognition as sr
 r = sr.Recognizer()
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
-triggers = ['coda', 'koda', 'cota', 'toyota', 'tota']
+triggers = ['coda', 'koda', 'cota', 'toyota', 'tota', 'kona']
 
 def capitalize(string):
     if not string:
@@ -82,7 +80,7 @@ def _download(title, artist):
     artist = ' '.join(map(capitalize, artist.split(' ')))
     with open('../YoutubeDownloaderClient/songs.txt', 'w') as f:
         f.write('{0} --- {1}'.format(title, artist))
-    res = os.system('cd ../YoutubeDownloaderClient && source env/bin/activate && python download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
+    res = os.system('cd ../YoutubeDownloaderClient && python3 download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
     if res == 0:
         logging.debug('Attempting to download {0} by {1} to {2}'.format(title, artist, '../YoutubeDownloader/downloads/{0} --- {1}'.format(artist, title)))
     lock['download']= False
@@ -99,49 +97,67 @@ def _play_music(title, artist):
 
     lock['play music'] = True
     logging.debug("Playing {path}".format(path=filename))
-    #try:
-    subprocess.check_call(['mpg321', filename, '--quiet'])
-    logging.debug("Stopping mpg321")
-    #except subprocess.CalledProcessError:
-    logging.debug('mpg321 killed.')
-    #finally:
-    lock['play music'] = False
-    return
+    try:
+        subprocess.check_call(['mpg321', filename, '--quiet'])
+        subprocess.check_call(['killall', 'mpg321'])
+        logging.debug("Stopping mpg321")
+    except subprocess.CalledProcessError:
+        logging.debug('mpg321 killed.')
+    finally:
+        lock['play music'] = False
+        return
 
 
-def _play_something_music(artist):
+def _play_something_music(artist=None):
     global lock
 
+    played_songs = []
+    collisions = 0
     while True:
         filename = get_filename(artist=artist)
+        if collisions >= 5:
+            print('Exhausted all/most options for %s ' % artist)
+            return
+
+        if filename in played_songs:
+            collisions += 1
+            continue
+
         if not filename or lock.get('play music'):
             return
 
+        played_songs.append(filename)
         lock['play music'] = True
         logging.debug("Playing {path}".format(path=filename))
         try:
             subprocess.check_call(['mpg321', filename, '--quiet'])
-            logging.debug("Stopping mpg321")
         except subprocess.CalledProcessError:
             logging.debug('mpg321 killed.')
             return
+
+        try:
+            subprocess.check_call(['killall', 'mpg321'])
+            logging.debug("Stopping mpg321")
+        except subprocess.CalledProcessError:
+            pass
         finally:
             lock['play music'] = False
+        print('Continuing after playing "something".')
+
+    return
 
 
 
-atlas = False
 download_locked = False
 # Listen for particular phrases
 def listen_for_phrases():
     global lock
     global spoken
     time_heard = None
-    r = 1
     while(True):
         time.sleep(0.15)  # So we don't do millions of iterations in succession...
         matches = any_matches(spoken, triggers)
-        if not lock.get('atlas') and matches:
+        if not lock.get('koda') and matches:
             for i in matches:
                 spoken[i] = ''
             print(matches)
@@ -149,30 +165,33 @@ def listen_for_phrases():
             print('Triggered!')
             subprocess.check_call(['mpg321', 'alert.mp3'])
             time_heard = datetime.datetime.now()
-            lock['atlas'] = True
+            lock['koda'] = True
 
-        if lock.get('atlas') and (datetime.datetime.now() - time_heard).seconds >= 10:
+        if lock.get('koda') and (datetime.datetime.now() - time_heard).seconds >= 10:
             print('Resetting...')
-            lock['atlas'] = False
-            # reset()
+            lock['koda'] = False
 
-        # PHRASE
-        if not lock.get('atlas'):
+        if not lock.get('koda'):
             continue
 
-        phrases = {re.compile(regex, flags=re.I): func for regex, func in keyword_expressions.items()}
+        phrases = ((re.compile(regex, flags=re.I), func) for regex, func in keyword_expressions)
 
         for i, user_said in enumerate(spoken):
-            for _re, func in phrases.items():
+            if not user_said:
+                continue
+            for _re, func in phrases:
                 match = _re.match(user_said)
                 if match and match.groups():
-                    print('Matched on %s' % user_said)
+                    print('Matched %s on %s' %( _re.pattern, user_said))
                     threading.Thread(target=func, args=match.groups()).start()
                     clear_matches(_re.pattern)
+                    break
                 elif match:
                     print('Matched on %s' % user_said)
                     threading.Thread(target=func).start()
                     clear_matches(_re.pattern)
+                    break
+
 
 def get_filename(title=None, artist=None):
     artist = artist.lower().strip()
@@ -183,6 +202,7 @@ def get_filename(title=None, artist=None):
     songs = list(songs)
 
     if not title:
+        print('Choices: \n\t{0}'.format('\n\t'.join(songs)))
         if not songs:
             return ''
         return os.path.join(init_path, random.choice(songs))
@@ -195,7 +215,7 @@ def get_filename(title=None, artist=None):
     print('Error... unable to parse from songs: {0}'.format(list(songs)))
     return ''
 
-spoken = [''] * 25
+spoken = ['t'] * 25
 def await_commands():
     threading.Thread(name='Listen for phrases', target=listen_for_phrases).start()
     i = 1
@@ -227,16 +247,18 @@ def listen(index):
             return
     return
 
+MUSIC_SOMETHING_RE = r'play something'
 MUSIC_RE = r'play (.+) by (.+)'
-MUSIC_SOMETHING_RE = r'play something by (.+)'
+MUSIC_SOMETHING_ARTIST_RE = r'play (?:something|a song) by (.+)'
 DOWNLOAD_RE = r'download (.+) by (.+)'
 STOP_MUSIC_RE = r'stop(?: the)? music'
-keyword_expressions = {
-    MUSIC_RE: _play_music,
-    MUSIC_SOMETHING_RE: _play_something_music,
-    DOWNLOAD_RE: _download,
-    STOP_MUSIC_RE: stop_the_music,
-}
+keyword_expressions = (
+    (MUSIC_SOMETHING_ARTIST_RE, _play_something_music),
+    (MUSIC_RE, _play_music),
+    (DOWNLOAD_RE, _download),
+    (STOP_MUSIC_RE, stop_the_music),
+    (MUSIC_SOMETHING_RE, _play_something_music),
+)
 
 if __name__ == "__main__":
     await_commands()
