@@ -158,16 +158,27 @@ def listen_for_phrases():
         time.sleep(0.15)  # So we don't do millions of iterations in succession...
         matches = any_matches(spoken, triggers)
         if not lock.get('koda') and matches:
+            try:
+                subprocess.check_call(['mpg321', 'alert.mp3'])
+            except subprocess.CalledProcessError:
+                print('Error... trying again')
+                continue
+
             for i in matches:
                 spoken[i] = ''
+
             print(matches)
             print(spoken)
             print('Triggered!')
-            subprocess.check_call(['mpg321', 'alert.mp3'])
+
             time_heard = datetime.datetime.now()
             lock['koda'] = True
 
-        if lock.get('koda') and (datetime.datetime.now() - time_heard).seconds >= 10:
+        if lock.get('koda') and (datetime.datetime.now() - time_heard).seconds >= 15:
+            matches = any_matches(spoken, triggers)
+            for i in matches:
+                spoken[i] = ''
+
             print('Resetting...')
             lock['koda'] = False
 
