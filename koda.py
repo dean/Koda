@@ -185,12 +185,14 @@ def listen_for_phrases():
         if not lock.get('koda'):
             continue
 
-        phrases = ((re.compile(regex, flags=re.I), func) for regex, func in keyword_expressions)
+        phrases = [(re.compile(regex, flags=re.I), func) for regex, func in keyword_expressions]
 
         for i, user_said in enumerate(spoken):
             if not user_said:
                 continue
+
             for _re, func in phrases:
+                print('Matching {0} against {1}'.format(_re.pattern, user_said))
                 match = _re.match(user_said)
                 if match and match.groups():
                     print('Matched %s on %s' %( _re.pattern, user_said))
@@ -226,7 +228,7 @@ def get_filename(title=None, artist=None):
     print('Error... unable to parse from songs: {0}'.format(list(songs)))
     return ''
 
-spoken = ['t'] * 25
+spoken = [''] * 10
 def await_commands():
     threading.Thread(name='Listen for phrases', target=listen_for_phrases).start()
     i = 1
