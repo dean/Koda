@@ -16,6 +16,7 @@ r = sr.Recognizer()
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
 triggers = ['coda', 'koda', 'cota', 'toyota', 'tota', 'kona']
+lock = {}
 
 def capitalize(string):
     if not string:
@@ -37,9 +38,11 @@ def clean(string, chars=list('.()-_')):
 
 # Stop programming music
 def stop_the_music():
+    global lock
     logging.debug("Killing mpg321")
     try:
         subprocess.check_call(['killall', 'mpg321'])
+        lock['play music'] = False
     except subprocess.CalledProcessError:
         pass
     finally:
@@ -49,19 +52,22 @@ def stop_the_music():
 
 def any_matches(_spoken, triggers):
     matches = []
-    for i, s in enumerate(_spoken):
-        for t in triggers:
-            if s.lower().startswith(t):
-                matches.append(i)
+    for i, s_list in enumerate(_spoken):
+        for s in s_list:
+            for t in triggers:
+                if s.lower().startswith(t):
+                    matches.append(i)
     return matches
 
 
 def clear_matches(_re):
     global spoken
-    for i, spoke in enumerate(spoken):
-        matches = re.match(_re, spoke, flags=re.I)
-        if matches:
-            spoken[i] = ''
+    for i, spoke_list in enumerate(spoken):
+        for spoke in spoke_list:
+            matches = re.match(_re, spoke, flags=re.I)
+            if matches:
+                spoken[i] = ''
+
 
 def parse_title_artist(s):
     s = s.lower()
@@ -69,6 +75,7 @@ def parse_title_artist(s):
     if len(split) == 1:
         return None
     return split
+
 
 def _download(title, artist):
     global lock
@@ -87,12 +94,12 @@ def _download(title, artist):
     return
 
 
-lock = {}
 def _play_music(title, artist):
     global lock
 
     filename = get_filename(title=title, artist=artist)
     if not filename or lock.get('play music'):
+        print('Locked or could not find file for: {0}'.format(filename))
         return
 
     lock['play music'] = True
@@ -147,8 +154,6 @@ def _play_something_music(artist=None):
     return
 
 
-
-download_locked = False
 # Listen for particular phrases
 def listen_for_phrases():
     global lock
@@ -187,26 +192,27 @@ def listen_for_phrases():
 
         phrases = [(re.compile(regex, flags=re.I), func) for regex, func in keyword_expressions]
 
-        for i, user_said in enumerate(spoken):
-            if not user_said:
+        for i, user_said_options in enumerate(spoken):
+            if not user_said_options:
                 continue
 
-            for _re, func in phrases:
-                print('Matching {0} against {1}'.format(_re.pattern, user_said))
-                match = _re.match(user_said)
-                if match and match.groups():
-                    print('Matched %s on %s' %( _re.pattern, user_said))
-                    threading.Thread(target=func, args=match.groups()).start()
-                    clear_matches(_re.pattern)
-                    break
-                elif match:
-                    print('Matched on %s' % user_said)
-                    threading.Thread(target=func).start()
-                    clear_matches(_re.pattern)
-                    break
+            for user_said in user_said_options:
+                for _re, func in phrases:
+                    match = _re.match(user_said)
+                    if match and match.groups():
+                        print('Matched %s on %s' %( _re.pattern, user_said))
+                        threading.Thread(target=func, args=match.groups()).start()
+                        clear_matches(_re.pattern)
+                        break
+                    elif match:
+                        print('Matched on %s' % user_said)
+                        threading.Thread(target=func).start()
+                        clear_matches(_re.pattern)
+                        break
 
 
 def get_filename(title=None, artist=None):
+    print(artist)
     artist = artist.lower().strip()
     print(title, artist)
     init_path = '/Users/dean/Programming/YoutubeDownloaderClient/downloads/'
@@ -224,9 +230,10 @@ def get_filename(title=None, artist=None):
     x = list(matches)
     print(x)
     if len(x) > 0:
-        return os.path.join(init_path, x[0])
+        return os.path.join(init_path, sorted(x, key=len)[0])
     print('Error... unable to parse from songs: {0}'.format(list(songs)))
     return ''
+
 
 spoken = [''] * 10
 def await_commands():
@@ -250,13 +257,13 @@ def listen(index):
             audio = r.listen(source, MAX_WAIT)  # listen for the first phrase and extract it into audio data
             # print("Set minimum energy threshold to {}".format(r.energy_threshold))
             logging.debug("Got it! Now recognizing it...")
-            value = r.recognize_google(audio)
-            if value and len(value) > 0:
-                logging.debug("You said {}".format(value))
-                spoken[index] = value
+            values = r.recognize_google(audio, show_all=True)
+            if values:
+                print(values)
+                spoken[index] = [x['transcript'] for x in values['alternative']]
         except (sr.UnknownValueError, sr.WaitTimeoutError, LookupError):  # speech is unintelligible
             # logging.debug("Oops! Didn't catch that or timed out.")
-            spoken[index] = ''
+            spoken[index] = []
             return
     return
 
