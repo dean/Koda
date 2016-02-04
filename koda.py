@@ -93,7 +93,6 @@ def listen_for_phrases():
             awake = False
             continue
 
-
         compiled_regex_func_mappings = [(re.compile(regex, flags=re.I), func)
                                         for regex, func in REGEX_FUNC_MAPPINGS]
 

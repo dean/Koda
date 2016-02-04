@@ -26,6 +26,11 @@ class MusicPlayer(object):
             return
 
     def play_song(self, title=None, artist=None,  limit=1000, front=False, back=False, extras=0):
+        #FIXME: Future Functions for simplicity
+        # if title and artist
+        # if title and not artist
+        # if artist and not title
+        # if not title and not artist
         if artist:
             for key in self.artists.keys():
                 # If we match an artist name
