@@ -100,7 +100,7 @@ def _download(title, artist):
 
 
 def _play_music(title, artist):
-    filenames = get_filename(title=title, artist=artist)
+    filename = get_filename(title=title, artist=artist)
     queue_song(filename)
     return
 
@@ -223,7 +223,7 @@ def listen_for_phrases():
 
 
 def get_filename(title=None, artist=None):
-    init_path = '/Users/dean/Programming/YoutubeDownloaderClient/downloads/'
+    init_path = '/Users/dean/Programming/YoutubeDownloaderClient/_downloads/'
     songs = os.listdir(init_path)
     if artist:
         artist = artist.lower().strip()
@@ -231,8 +231,8 @@ def get_filename(title=None, artist=None):
         songs = list(songs)
 
         if title:
-            matches = list(filter(lambda s: title in clean(s.lower()), songs))
-            if not matches:
+            matches = list(filter(lambda s: title.lower() in clean(s.lower()), songs))
+            if len(matches) == 0:
                 print('Error... unable to parse from songs: {0}'.format(list(songs)))
                 return None
             return os.path.join(init_path, sorted(matches, key=len)[0])
