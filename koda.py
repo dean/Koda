@@ -17,10 +17,7 @@ import config
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
 
-
-
-
-LOCK = {}
+spoken = [''] * 15
 MUSIC_SOMETHING_ARTIST_RE = r'play (?:something|a song) by (.+)'
 MUSIC_RE = r'play (.+) by (.+)'
 MUSIC_SOMETHING_ELSE_RE = r'play something else'
@@ -115,8 +112,6 @@ def listen_for_phrases():
                     break
 
 
-
-spoken = [''] * 15
 def await_commands():
     """ Does our initial thread spawns and spawns listeners periodically. """
     threading.Thread(name='Koda', target=listen_for_phrases).start()
