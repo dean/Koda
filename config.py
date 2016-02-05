@@ -1,5 +1,6 @@
 import commands
 
+NUM_LISTENERS = 15
 KODA_TRIGGERS = ['coda', 'koda', 'cota', 'toyota', 'tota', 'kona']
 MUSIC_SOMETHING_ARTIST_RE = r'play (?:something|a song) by (.+)'
 MUSIC_RE = r'play (.+) by (.+)'

@@ -18,7 +18,7 @@ import config
 # Initialization
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
-spoken = [''] * 15
+spoken = [''] * config.NUM_LISTENERS
 
 
 def all_match_indices(_spoken, triggers):
@@ -115,7 +115,8 @@ def await_commands():
     threading.Thread(name='Music', target=commands.music_player).start()
     i = 1
     while(True):
-        threading.Thread(name='Listener%d' % (i % 7), target=listen, args=(i % 7,)).start()
+        n = i % config.NUM_LISTENERS
+        threading.Thread(name='Listener%d' % n, target=listen, args=(n,)).start()
         time.sleep(2)
         i += 1
 
@@ -136,7 +137,6 @@ def listen(index):
             if values:
                 spoken[index] = [x['transcript'] for x in values['alternative']]
         except (sr.UnknownValueError, sr.WaitTimeoutError, LookupError):  # speech is unintelligible
-            # logging.debug("Oops! Didn't catch that or timed out.")
             spoken[index] = []
             return
     return
