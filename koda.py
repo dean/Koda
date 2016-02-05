@@ -21,22 +21,7 @@ logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
 
 spoken = [''] * 15
-MUSIC_SOMETHING_ARTIST_RE = r'play (?:something|a song) by (.+)'
-MUSIC_RE = r'play (.+) by (.+)'
-MUSIC_SOMETHING_ELSE_RE = r'play something else'
-MUSIC_SOMETHING_RE = r'play something$'
-MUSIC_PLAY_TITLE_RE = r'^play (.+)'
-DOWNLOAD_RE = r'download (.+) by (.+)'
-STOP_MUSIC_RE = r'stop(?: the)? music'
-REGEX_FUNC_MAPPINGS = (
-    (MUSIC_SOMETHING_ARTIST_RE, commands._play_something_by_artist),
-    (MUSIC_RE, commands._play_music),
-    (MUSIC_SOMETHING_ELSE_RE, commands._play_something_else),
-    (MUSIC_SOMETHING_RE, commands._play_something),
-    (MUSIC_PLAY_TITLE_RE, commands._play),
-    (DOWNLOAD_RE, commands._download),
-    (STOP_MUSIC_RE, commands._stop_the_music),
-)
+
 
 
 def all_match_indices(_spoken, triggers):
@@ -60,6 +45,11 @@ def clear_matches_for_regex(_re):
                 print('Clearing match for: {0}'.format(spoke))
                 spoken[i] = ''
 
+
+def clear_matches_for_func_name(func_name):
+    for _re, _func_name in config.REGEX_FUNC_MAPPINGS:
+        if func_name == _func_name:
+            return clear_matches_for_regex(_re)
 
 def play_awake_sound():
     """ PLay the default alert tone for Koda. """
@@ -92,23 +82,31 @@ def listen_for_phrases():
         now = datetime.datetime.now()
         seconds_awake = (now - woken_up_at).seconds
         if seconds_awake >= 15:
+            # FIXME: Helper function here
+            match_indices = all_match_indices(spoken, config.KODA_TRIGGERS)
+            for i in match_indices:
+                spoken[i] = ''
+
             awake = False
             continue
 
         compiled_regex_func_mappings = [(re.compile(regex, flags=re.I), func)
-                                        for regex, func in REGEX_FUNC_MAPPINGS]
+                                        for regex, func in config.REGEX_FUNC_MAPPINGS]
 
         all_user_said = itertools.chain.from_iterable(spoken)
         for user_said in all_user_said:
             if not all_user_said:
                 continue
 
-            for _re, func in compiled_regex_func_mappings:
+            for _re, func_name in compiled_regex_func_mappings:
                 match = _re.match(user_said)
                 if match:
                     print('Matched %s on %s' %( _re.pattern, user_said))
-                    threading.Thread(target=func, args=match.groups()).start()
+                    threading.Thread(target=getattr(commands, func_name), args=match.groups()).start()
                     clear_matches_for_regex(_re.pattern)
+
+                    # Enable ourselves to rapidly give commands to Koda in succession.
+                    woken_up_at = datetime.datetime.now()
                     break
 
 

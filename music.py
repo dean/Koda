@@ -37,6 +37,8 @@ class MusicPlayer(object):
         # if title and not artist
         # if artist and not title
         # if not title and not artist
+        random.seed(123456)
+
         if artist:
             for key in self.artists.keys():
                 # If we match an artist name
@@ -99,6 +101,6 @@ class MusicPlayer(object):
             return
 
     def stop_all_music(self):
-        queue = []
+        self.queue = []
         self.stop_music()
         return

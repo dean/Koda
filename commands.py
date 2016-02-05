@@ -1,14 +1,13 @@
 import logging
 import time
 
+from koda import clear_matches_for_func_name
 from music import MusicPlayer
 
 
-player = None
-
 def music_player():
-    global player
     player = MusicPlayer()
+    globals()['player'] = player
     player.play_music_as_available()
     return
 
@@ -20,7 +19,11 @@ def locked_command(f):
         lock_key = f.__name__
         if not lock.get(lock_key):
             lock[lock_key] = True
-            f(*args)
+            stall = f(*args)
+            if stall:
+                clear_matches_for_func_name(f.__name__)
+                time.sleep(5)
+                clear_matches_for_func_name(f.__name__)
             lock[lock_key] = False
     return wrapped_f
 
@@ -32,8 +35,8 @@ def _download(title, artist):
     artist = ' '.join(map(capitalize, artist.split(' ')))
     with open('../YoutubeDownloaderClient/songs.txt', 'w') as f:
         f.write('{0} --- {1}'.format(title, artist))
-    res = os.system('cd ../YoutubeDownloaderClient && python3 download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
-    if res == 0:
+    success = os.system('cd ../YoutubeDownloaderClient && python3 download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
+    if success == 0:
         logging.debug('Attempting to download {0} by {1} to {2}'.format(title, artist, '../YoutubeDownloader/downloads/{0} --- {1}'.format(artist, title)))
     return
 
@@ -48,19 +51,19 @@ def _stop_the_music():
 @locked_command
 def _play_music(title, artist):
     global player
-    res = player.play_song(title=title, artist=artist, extras=5)
-    if res:
-        time.sleep(5)
-    return
+    success = player.play_song(title=title, artist=artist, extras=5)
+    if success:
+        return True
+    return False
 
 
 @locked_command
 def _play_something_by_artist(artist):
     global player
-    res = player.play_song(artist=artist)
-    if res:
-        time.sleep(5)
-    return
+    success = player.play_song(artist=artist)
+    if success:
+        return True
+    return False
 
 
 @locked_command
@@ -70,17 +73,16 @@ def _play_something_else():
         player.play_song(limit=3)
     else:
         player.skip()
-    time.sleep(5)
-    return
+    return True
 
 
 @locked_command
 def _play(title):
     global player
-    res = player.play_song(title=title, limit=5)
-    if res:
-        time.sleep(5)
-    return
+    success = player.play_song(title=title, limit=5)
+    if success:
+        return True
+    return False
 
 
 @locked_command
@@ -88,4 +90,4 @@ def _play_something():
     global player
     player.play_song(limit=5)
     time.sleep(5)
-    return
+    return True
