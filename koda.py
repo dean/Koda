@@ -6,7 +6,6 @@ import os
 import random
 import re
 import subprocess
-import sys
 import time
 import threading
 
@@ -19,9 +18,7 @@ import config
 # Initialization
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
-
 spoken = [''] * 15
-
 
 
 def all_match_indices(_spoken, triggers):
@@ -47,9 +44,11 @@ def clear_matches_for_regex(_re):
 
 
 def clear_matches_for_func_name(func_name):
+    ''' Reverse maps a func name to regex and finds the corresponding match. '''
     for _re, _func_name in config.REGEX_FUNC_MAPPINGS:
         if func_name == _func_name:
             return clear_matches_for_regex(_re)
+
 
 def play_awake_sound():
     """ PLay the default alert tone for Koda. """
