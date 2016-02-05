@@ -1,5 +1,7 @@
-from functools import defaultdict
+from collections import defaultdict
 import random
+import time
+import subprocess
 
 from helpers import clean
 
@@ -8,18 +10,22 @@ from pyItunes import *
 
 class MusicPlayer(object):
     currently_playing = None
-    queue = []
 
     def __init__(self):
         library = Library('/Users/dean/Documents/Library-New.xml')
         self.songs = [song for _, song in library.songs.items()]
         self.artists = defaultdict(list)
+        self.queue = []
         for song in self.songs:
-            self.artists[song_obj.artist].append(song)
+            if not song.location:
+                continue
+
+            song.location = '/' + song.location
+            self.artists[song.artist].append(song)
 
     def _play(self, filename):
         try:
-            subprocess.check_call(['mpg321', filename, '--quiet'])
+            output = subprocess.check_output(['mpg321', filename, '--quiet'])
         except subprocess.CalledProcessError:
             logging.debug('mpg321 killed.')
         finally:
@@ -34,42 +40,47 @@ class MusicPlayer(object):
         if artist:
             for key in self.artists.keys():
                 # If we match an artist name
+                if not key:
+                    continue
+
                 if clean(artist.lower()) in clean(key.lower()):
                     # If we match a title
                     if title:
                         title_match = list(filter(lambda x: clean(title.lower()) in clean(x.name.lower()), self.artists[key]))
                         if title_match:
-                            queue = [title_match.location] + queue
+                            self.queue = title_match + self.queue
                             self.stop_music()
-                            return
+                            return True
                     else:
-                        queue = [song.location for song in self.artists[key]][:limit] + queue
+                        self.queue = self.artists[key][:limit] + self.queue
                         self.stop_music()
-                        return
+                        return True
 
         if title:
             title_match = list(filter(lambda x: clean(title.lower()) in clean(x.name.lower()), self.songs))
             if title_match:
-                queue = [title_match.location][:limit] + queue
+                self.queue = [random.choice(title_match)]+ self.queue
                 self.stop_music()
-                return
+                return True
 
         if not title and not artist:
             songs = []
             rated_songs = list(filter(lambda x: x.rating and x.rating >= 60, self.songs))
-            for x in xrange(limit):
-                songs.append(rated_songs.pop(random.random % len(rated_songs)))
-            queue = songs + queue
+            for x in range(limit):
+                songs.append(rated_songs.pop(int(random.random()) % len(rated_songs)))
+            self.queue = songs + self.queue
             self.stop_music()
+
+        return False
 
     def play_music_as_available(self):
         while True:
-            if len(queue) == 0:
+            if len(self.queue) == 0:
                 time.sleep(0.15)
                 continue
 
-            next_song = queue.pop()
-            print('Playing {name} by {artist}'.format(next_song.name, next_song.artist)
+            next_song = self.queue.pop()
+            print('Playing {0} by {1}'.format(next_song.name, next_song.artist))
             self._play(next_song.location)
         return
 

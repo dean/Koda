@@ -1,11 +1,12 @@
 import logging
+import time
 
 from music import MusicPlayer
 
 
 player = None
 
-def music_player::
+def music_player():
     global player
     player = MusicPlayer()
     player.play_music_as_available()
@@ -24,7 +25,7 @@ def locked_command(f):
     return wrapped_f
 
 
-@locked_command()
+@locked_command
 def _download(title, artist):
     #FIXME: Use YoutubeDownloader API fool
     title = ' '.join(map(capitalize, title.split(' ')))
@@ -44,35 +45,47 @@ def _stop_the_music():
     return
 
 
-@locked_command()
+@locked_command
 def _play_music(title, artist):
     global player
-    player.play_song(title=title, artist=artist, extras=5)
+    res = player.play_song(title=title, artist=artist, extras=5)
+    if res:
+        time.sleep(5)
     return
 
 
 @locked_command
 def _play_something_by_artist(artist):
     global player
-    player.play_song(artist=artist)
+    res = player.play_song(artist=artist)
+    if res:
+        time.sleep(5)
     return
 
 
 @locked_command
 def _play_something_else():
     global player
-    player.skip()
+    if len(player.queue) == 0:
+        player.play_song(limit=3)
+    else:
+        player.skip()
+    time.sleep(5)
     return
 
 
 @locked_command
 def _play(title):
     global player
-    player.play_song(title=title, limit=5)
+    res = player.play_song(title=title, limit=5)
+    if res:
+        time.sleep(5)
     return
+
 
 @locked_command
 def _play_something():
     global player
     player.play_song(limit=5)
+    time.sleep(5)
     return

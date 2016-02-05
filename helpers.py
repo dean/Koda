@@ -1,13 +1,4 @@
-
-
-def parse_title_artist(s):
-    s = s.lower()
-    split = s.split(' by' )
-    if len(split) == 1:
-        return None
-    return split
-
-
+import functools
 
 
 def capitalize(string):
@@ -29,5 +20,3 @@ def clean(string, chars=list('.()-_')):
     """
     return functools.reduce(lambda original, ignore: original.replace(ignore, ''),
                   [string] + chars)
-
-

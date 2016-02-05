@@ -1,5 +1,6 @@
 import datetime
 import functools
+import itertools
 import logging
 import os
 import random
@@ -11,7 +12,9 @@ import threading
 
 import speech_recognition as sr
 
+import commands
 import config
+
 
 # Initialization
 logging.basicConfig(level=logging.DEBUG,
@@ -30,7 +33,7 @@ REGEX_FUNC_MAPPINGS = (
     (MUSIC_RE, commands._play_music),
     (MUSIC_SOMETHING_ELSE_RE, commands._play_something_else),
     (MUSIC_SOMETHING_RE, commands._play_something),
-    (MUSIC_PLAY_TITLE_RE, commands._play)
+    (MUSIC_PLAY_TITLE_RE, commands._play),
     (DOWNLOAD_RE, commands._download),
     (STOP_MUSIC_RE, commands._stop_the_music),
 )
@@ -43,7 +46,7 @@ def all_match_indices(_spoken, triggers):
         for s in s_list:
             for t in triggers:
                 if s.lower().startswith(t):
-                    matche_indices.append(i)
+                    match_indices.append(i)
     return match_indices
 
 
@@ -54,9 +57,8 @@ def clear_matches_for_regex(_re):
         for spoke in spoke_list:
             matches = re.match(_re, spoke, flags=re.I)
             if matches:
+                print('Clearing match for: {0}'.format(spoke))
                 spoken[i] = ''
-
-
 
 
 def play_awake_sound():
@@ -73,7 +75,7 @@ def listen_for_phrases():
     woken_up_at = None
     while True:
         time.sleep(0.15)
-        match_indices = all_matches_indices(heard, config.KODA_TRIGGERS)
+        match_indices = all_match_indices(spoken, config.KODA_TRIGGERS)
         if not awake and len(match_indices) > 0:
             # Waking up!
             play_awake_sound()
@@ -105,16 +107,15 @@ def listen_for_phrases():
                 match = _re.match(user_said)
                 if match:
                     print('Matched %s on %s' %( _re.pattern, user_said))
-                    spawn_locked_thread(func, _re.pattern, args=match.groups())
                     threading.Thread(target=func, args=match.groups()).start()
-                    clear_matches(_re.pattern)
+                    clear_matches_for_regex(_re.pattern)
                     break
 
 
 def await_commands():
     """ Does our initial thread spawns and spawns listeners periodically. """
     threading.Thread(name='Koda', target=listen_for_phrases).start()
-    threading.Thread(name='Music', target=music_thread).start()
+    threading.Thread(name='Music', target=commands.music_player).start()
     i = 1
     while(True):
         threading.Thread(name='Listener%d' % (i % 7), target=listen, args=(i % 7,)).start()
