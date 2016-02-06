@@ -37,7 +37,7 @@ class MusicPlayer(object):
         # if title and not artist
         # if artist and not title
         # if not title and not artist
-        random.seed(123456)
+        random.seed()
 
         if artist:
             for key in self.artists.keys():
@@ -54,13 +54,20 @@ class MusicPlayer(object):
                             self.stop_music()
                             return True
                     else:
-                        self.queue = self.artists[key][:limit] + self.queue
+                        songs = self.artists[key]
+                        random.shuffle(songs)
+                        self.queue = songs[:limit] + self.queue
                         self.stop_music()
                         return True
 
         if title:
-            title_match = list(filter(lambda x: clean(title.lower()) in clean(x.name.lower()), self.songs))
-            if title_match:
+            exact_title_match = list(filter(lambda x: clean(title.lower()) == clean(x.name.lower()), self.songs))
+            title_match = list(sorted(filter(lambda x: clean(title.lower()) == clean(x.name.lower()), self.songs), key=lambda x: len(x.name)))
+            if exact_title_match:
+                self.queue = [exact_title_match[0]]+ self.queue
+                self.stop_music()
+                return True
+            elif title_match:
                 self.queue = [random.choice(title_match)]+ self.queue
                 self.stop_music()
                 return True
@@ -68,9 +75,8 @@ class MusicPlayer(object):
         if not title and not artist:
             songs = []
             rated_songs = list(filter(lambda x: x.rating and x.rating >= 60, self.songs))
-            for x in range(limit):
-                songs.append(rated_songs.pop(int(random.random()) % len(rated_songs)))
-            self.queue = songs + self.queue
+            random.shuffle(rated_songs)
+            self.queue = rated_songs[:limit] + self.queue
             self.stop_music()
 
         return False
@@ -81,8 +87,10 @@ class MusicPlayer(object):
                 time.sleep(0.15)
                 continue
 
-            next_song = self.queue.pop()
-            print('Playing {0} by {1}'.format(next_song.name, next_song.artist))
+            next_song = self.queue.pop(0)
+            print('Now playing {0} by {1}'.format(next_song.name, next_song.artist))
+            if len(self.queue) > 0:
+                print('Up next: {0} by {1}'.format(self.queue[0].name, self.queue[0].artist))
             self._play(next_song.location)
         return
 
