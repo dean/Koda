@@ -12,18 +12,17 @@ def music_player():
     return
 
 
-lock = {}
 def locked_command(f):
     def wrapped_f(*args, **kwargs):
-        global lock
+        lock, spoken = kwargs['lock'], kwargs['spoken']
         lock_key = f.__name__
         if not lock.get(lock_key):
             lock[lock_key] = True
             stall = f(*args)
             if stall:
-                clear_matches_for_func_name(f.__name__)
+                clear_matches_for_func_name(f.__name__, spoken)
                 time.sleep(5)
-                clear_matches_for_func_name(f.__name__)
+                clear_matches_for_func_name(f.__name__, spoken)
             lock[lock_key] = False
     return wrapped_f
 

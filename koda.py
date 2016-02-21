@@ -18,7 +18,6 @@ import config
 # Initialization
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(levelname)s] (%(threadName)-10s) {%(funcName)s} %(message)s',)
-spoken = [''] * config.NUM_LISTENERS
 
 
 def all_match_indices(_spoken, triggers):
@@ -32,9 +31,8 @@ def all_match_indices(_spoken, triggers):
     return match_indices
 
 
-def clear_matches_for_regex(_re):
+def clear_matches_for_regex(_re, spoken):
     """ Clear all spoken matches for an associated regex. """
-    global spoken
     for i, spoke_list in enumerate(spoken):
         for spoke in spoke_list:
             matches = re.match(_re, spoke, flags=re.I)
@@ -43,11 +41,11 @@ def clear_matches_for_regex(_re):
                 spoken[i] = ''
 
 
-def clear_matches_for_func_name(func_name):
+def clear_matches_for_func_name(func_name, spoken):
     ''' Reverse maps a func name to regex and finds the corresponding match. '''
     for _re, _func_name in config.REGEX_FUNC_MAPPINGS:
         if func_name == _func_name:
-            return clear_matches_for_regex(_re)
+            return clear_matches_for_regex(_re, spoken)
 
 
 def play_awake_sound():
@@ -58,10 +56,11 @@ def play_awake_sound():
         pass
 
 
-def listen_for_phrases():
+def listen_for_phrases(spoken):
     """ Main thread for listening for our key phrases. """
     awake = False
     woken_up_at = None
+    lock = {}
     while True:
         time.sleep(0.15)
         match_indices = all_match_indices(spoken, config.KODA_TRIGGERS)
@@ -94,15 +93,15 @@ def listen_for_phrases():
 
         all_user_said = itertools.chain.from_iterable(spoken)
         for user_said in all_user_said:
-            if not all_user_said:
+            if not user_said:
                 continue
 
             for _re, func_name in compiled_regex_func_mappings:
                 match = _re.match(user_said)
                 if match:
                     print('Matched %s on %s' %( _re.pattern, user_said))
-                    threading.Thread(target=getattr(commands, func_name), args=match.groups()).start()
-                    clear_matches_for_regex(_re.pattern)
+                    threading.Thread(target=getattr(commands, func_name), args=match.groups(), kwargs={'spoken': spoken, 'lock': lock}).start()
+                    time.sleep(0.15)
 
                     # Enable ourselves to rapidly give commands to Koda in succession.
                     woken_up_at = datetime.datetime.now()
@@ -111,20 +110,20 @@ def listen_for_phrases():
 
 def await_commands():
     """ Does our initial thread spawns and spawns listeners periodically. """
-    threading.Thread(name='Koda', target=listen_for_phrases).start()
+    spoken = [''] * 15
+    threading.Thread(name='Koda', target=listen_for_phrases, args=(spoken,)).start()
     threading.Thread(name='Music', target=commands.music_player).start()
     i = 1
     while(True):
         n = i % config.NUM_LISTENERS
-        threading.Thread(name='Listener%d' % n, target=listen, args=(n,)).start()
+        threading.Thread(name='Listener%d' % n, target=listen, args=(n, spoken)).start()
         time.sleep(2)
         i += 1
 
 
 # Speech to text
-def listen(index):
+def listen(index, spoken):
     """ A general listener. """
-    global spoken
     MAX_WAIT = index + 5  # seconds
     logging.debug("Listening...")
     with sr.Microphone() as source:  # use the default microphone as the audio source
