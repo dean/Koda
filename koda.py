@@ -101,7 +101,7 @@ def listen_for_phrases(spoken):
                 if match:
                     print('Matched %s on %s' %( _re.pattern, user_said))
                     threading.Thread(target=getattr(commands, func_name), args=match.groups(), kwargs={'spoken': spoken, 'lock': lock}).start()
-                    time.sleep(0.15)
+                    time.sleep(0.25)
 
                     # Enable ourselves to rapidly give commands to Koda in succession.
                     woken_up_at = datetime.datetime.now()

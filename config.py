@@ -1,5 +1,6 @@
 import commands
 
+EXPORTED_ITUNES_LIBRARY = '/Users/dean/Documents/Library-New.xml'
 NUM_LISTENERS = 15
 KODA_TRIGGERS = ['coda', 'koda', 'cota', 'toyota', 'tota', 'kona']
 MUSIC_SOMETHING_ARTIST_RE = r'play (?:something|a song) by (.+)'

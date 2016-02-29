@@ -3,16 +3,48 @@ import random
 import time
 import subprocess
 
+
+import config
 from helpers import clean
 
-from pyItunes import *
+try:
+    from pyItunes import *
+except ImportError: # Windows
+    import os
+    import taglib
 
+    class Song(object):
+        def __init__(self, name, artist, location, rating=100):
+            self.name = name
+            self.artist = artist
+            self.location = location
+            self.rating = rating
+
+    class Library(object):
+        def __init__(self, path):
+            self.songs = {}
+            for file_path in os.listdir(path):
+                if not file_path.endswith('.mp3'):
+                    continue
+
+                full_file_path = os.path.join(path, file_path)
+                name, artist = self.get_name_and_artist(file_path)
+                if name and artist:
+                    self.songs[artist] = Song(name, artist, full_file_path)
+
+        def get_name_and_artist(self, path):
+            try:
+                artist, title = path.split(' - ')
+                return title.strip(), artist.strip()
+            except:
+                print('More than one "-" was found in {0} so it was skipped.'.format(path))
+                return None, None
 
 class MusicPlayer(object):
     currently_playing = None
 
     def __init__(self):
-        library = Library('/Users/dean/Documents/Library-New.xml')
+        library = Library(config.EXPORTED_ITUNES_LIBRARY)
         self.songs = [song for _, song in library.songs.items()]
         self.artists = defaultdict(list)
         self.queue = []
@@ -20,7 +52,7 @@ class MusicPlayer(object):
             if not song.location:
                 continue
 
-            song.location = '/' + song.location
+            song.location = '/' + song.location if not song.location.startswith('/') else song.location
             self.artists[song.artist].append(song)
 
     def _play(self, filename):
@@ -31,7 +63,7 @@ class MusicPlayer(object):
         finally:
             return
 
-    def play_song(self, title=None, artist=None,  limit=1000, front=False, back=False, extras=0):
+    def play_song(self, title=None, artist=None,  limit=1000):
         #FIXME: Future Functions for simplicity
         # if title and artist
         # if title and not artist
