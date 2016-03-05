@@ -50,7 +50,7 @@ def _stop_the_music():
 @locked_command
 def _play_music(title, artist):
     global player
-    success = player.play_song(title=title, artist=artist, extras=5)
+    success = player.play_song(title=title, artist=artist)
     if success:
         return True
     return False
