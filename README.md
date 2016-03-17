@@ -21,3 +21,6 @@ Koda relies on Google's speech recognition and TTS APIs:
 For a quick install, run:
 
     pip install SpeechRecognition
+    
+
+** Code was originally forked from https://github.com/danesherbs/Atlas. Sorry for not attributing work sooner.
