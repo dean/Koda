@@ -47,6 +47,9 @@ class MusicPlayer(object):
         library = Library(config.EXPORTED_ITUNES_LIBRARY)
         self.songs = [song for _, song in library.songs.items()]
         self.artists = defaultdict(list)
+
+        # FIXME: Since we pop from both sides, we should consider using a
+        # collections.deque
         self.queue = []
         for song in self.songs:
             if not song.location:
@@ -60,8 +63,6 @@ class MusicPlayer(object):
             output = subprocess.check_output(['mpg321', filename, '--quiet'])
         except subprocess.CalledProcessError:
             logging.debug('mpg321 killed.')
-        finally:
-            return
 
     def play_song(self, title=None, artist=None,  limit=1000):
         #FIXME: Future Functions for simplicity
@@ -115,20 +116,18 @@ class MusicPlayer(object):
 
     def play_music_as_available(self):
         while True:
-            if len(self.queue) == 0:
+            if not self.queue:
                 time.sleep(0.15)
                 continue
 
             next_song = self.queue.pop(0)
             print('Now playing {0} by {1}'.format(next_song.name, next_song.artist))
-            if len(self.queue) > 0:
+            if self.queue > 0:
                 print('Up next: {0} by {1}'.format(self.queue[0].name, self.queue[0].artist))
             self._play(next_song.location)
-        return
 
     def skip(self):
         self.stop_music()
-        return
 
     def stop_music(self):
         try:
@@ -137,10 +136,8 @@ class MusicPlayer(object):
             logging.debug("Stopping mpg321")
         except subprocess.CalledProcessError:
             pass
-        finally:
-            return
 
     def stop_all_music(self):
         self.queue = []
         self.stop_music()
-        return
+
