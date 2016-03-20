@@ -4,7 +4,6 @@ import time
 import subprocess
 
 
-import config
 from helpers import clean
 
 try:
@@ -19,30 +18,64 @@ except ImportError: # Windows
             self.location = location
             self.rating = rating
 
+        @classmethod
+        def from_file(cls, path):
+            """
+            Return the Song object that corresponds to a file on disk.
+            """
+
+            try:
+                artist, title = os.path.basename(path).split(' - ')
+            except ValueError:
+                error = 'Could not create song from file: {}...'.format(path)
+                raise ValueError(error)
+
+            if not artist or not title:
+                error = 'Could not find a metadata for: {}...'.format(path)
+                raise ValueError(error)
+
+            return cls(title, artist, path)
+
+        def __eq__(self, other):
+            ours = (self.name, self.artist, self.location, self.rating)
+            theirs = (other.name, other.artist, other.location, other.rating)
+            return all(zip(ours, theirs))
+
+        def __repr__(self):
+            """
+            Returns the string representation of a Song object.
+
+            We do not include information about the location or rating of
+            the song in the interest of brevity and readability, as we are
+            usually interested in the song name and artist.
+            """
+            return 'Song(name={0.name} artist={0.artist})'.format(self)
+
+
     class Library(object):
         def __init__(self, path):
-            self.songs = {}
-            for file_path in os.listdir(path):
-                if not file_path.endswith('.mp3'):
+            self.songs = self.find_songs(path)
+
+        def find_songs(self, path):
+            """
+            Return a dict of songs found in :path:
+            Key: artist
+            Value: Song object
+            """
+            songs = {}
+            for songfile in os.listdir(path):
+                if not songfile.endswith('.mp3'):
                     continue
 
-                full_file_path = os.path.join(path, file_path)
-                name, artist = self.get_name_and_artist(file_path)
-                if name and artist:
-                    self.songs[artist] = Song(name, artist, full_file_path)
+                song = Song.from_file(songfile)
+                songs[song.artist] = song
 
-        def get_name_and_artist(self, path):
-            try:
-                artist, title = path.split(' - ')
-                return title.strip(), artist.strip()
-            except:
-                print('More than one "-" was found in {0} so it was skipped.'.format(path))
-                return None, None
 
 class MusicPlayer(object):
     currently_playing = None
 
     def __init__(self):
+        import config
         library = Library(config.EXPORTED_ITUNES_LIBRARY)
         self.songs = [song for _, song in library.songs.items()]
         self.artists = defaultdict(list)
