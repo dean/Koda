@@ -153,9 +153,9 @@ class MusicPlayer(object):
                 continue
 
             next_song = self.queue.pop(0)
-            print('Now playing {0} by {1}'.format(next_song.name, next_song.artist))
-            if self.queue > 0:
-                print('Up next: {0} by {1}'.format(self.queue[0].name, self.queue[0].artist))
+            print('Now playing {0.name} by {0.artist}'.format(next_song))
+            if self.queue:
+                print('Up next: {0.name} by {0.artist}'.format(self.queue[0]))
             self._play(next_song.location)
 
     def skip(self):
