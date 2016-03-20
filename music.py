@@ -11,7 +11,6 @@ try:
     from pyItunes import *
 except ImportError: # Windows
     import os
-    import taglib
 
     class Song(object):
         def __init__(self, name, artist, location, rating=100):
