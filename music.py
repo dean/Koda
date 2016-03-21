@@ -26,6 +26,7 @@ except ImportError: # Windows
 
             try:
                 artist, title = os.path.basename(path).split(' - ')
+                title, _ = os.path.splitext(title)
             except ValueError:
                 error = 'Could not create song from file: {}...'.format(path)
                 raise ValueError(error)
@@ -37,9 +38,9 @@ except ImportError: # Windows
             return cls(title, artist, path)
 
         def __eq__(self, other):
-            ours = (self.name, self.artist, self.location, self.rating)
-            theirs = (other.name, other.artist, other.location, other.rating)
-            return all(zip(ours, theirs))
+            us = (self.name, self.artist)
+            them = (other.name, other.artist)
+            return us == them
 
         def __repr__(self):
             """
@@ -63,12 +64,31 @@ except ImportError: # Windows
             Value: Song object
             """
             songs = {}
-            for songfile in os.listdir(path):
-                if not songfile.endswith('.mp3'):
-                    continue
 
+            for songfile in self.find_audio_files(path):
                 song = Song.from_file(songfile)
                 songs[song.artist] = song
+
+            return songs
+
+
+        def find_audio_files(self, path):
+            return [songfile for songfile in os.listdir(path) if songfile.endswith('.mp3')]
+
+        def __eq__(self, other):
+            return self.songs == other.songs
+
+        def __ne__(self, other):
+            return not self == other
+
+        def __repr__(self):
+            """
+            Returns the string representation of a Library object.
+
+            We do not print the songs dict in the interest of brevity
+            and readability, since a library could contain many songs.
+            """
+            return 'Library()'.format(self)
 
 
 class MusicPlayer(object):
