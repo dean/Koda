@@ -4,14 +4,12 @@ import time
 import subprocess
 
 
-import config
 from helpers import clean
 
 try:
     from pyItunes import *
 except ImportError: # Windows
     import os
-    import taglib
 
     class Song(object):
         def __init__(self, name, artist, location, rating=100):
@@ -20,48 +18,109 @@ except ImportError: # Windows
             self.location = location
             self.rating = rating
 
+        @classmethod
+        def from_file(cls, path):
+            """
+            Return the Song object that corresponds to a file on disk.
+            """
+
+            try:
+                artist, title = os.path.basename(path).split(' - ')
+                title, _ = os.path.splitext(title)
+            except ValueError:
+                error = 'Could not create song from file: {}...'.format(path)
+                raise ValueError(error)
+
+            if not artist or not title:
+                error = 'Could not find a metadata for: {}...'.format(path)
+                raise ValueError(error)
+
+            return cls(title, artist, path)
+
+        def __eq__(self, other):
+            us = (self.name, self.artist)
+            them = (other.name, other.artist)
+            return us == them
+
+        def __repr__(self):
+            """
+            Returns the string representation of a Song object.
+
+            We do not include information about the location or rating of
+            the song in the interest of brevity and readability, as we are
+            usually interested in the song name and artist.
+            """
+            return 'Song(name={0.name} artist={0.artist})'.format(self)
+
+
     class Library(object):
         def __init__(self, path):
-            self.songs = {}
-            for file_path in os.listdir(path):
-                if not file_path.endswith('.mp3'):
-                    continue
+            self.songs = self.find_songs(path)
 
-                full_file_path = os.path.join(path, file_path)
-                name, artist = self.get_name_and_artist(file_path)
-                if name and artist:
-                    self.songs[artist] = Song(name, artist, full_file_path)
+        def find_songs(self, path):
+            """
+            Return a dict of songs found in :path:
+            Key: artist
+            Value: Song object
+            """
+            songs = {}
 
-        def get_name_and_artist(self, path):
-            try:
-                artist, title = path.split(' - ')
-                return title.strip(), artist.strip()
-            except:
-                print('More than one "-" was found in {0} so it was skipped.'.format(path))
-                return None, None
+            for songfile in self.find_audio_files(path):
+                song = Song.from_file(songfile)
+                songs[song.artist] = song
+
+            return songs
+
+
+        def find_audio_files(self, path):
+            return [songfile for songfile in os.listdir(path) if songfile.endswith('.mp3')]
+
+        def __eq__(self, other):
+            return self.songs == other.songs
+
+        def __ne__(self, other):
+            return not self == other
+
+        def __repr__(self):
+            """
+            Returns the string representation of a Library object.
+
+            We do not print the songs dict in the interest of brevity
+            and readability, since a library could contain many songs.
+            """
+            return 'Library()'.format(self)
+
 
 class MusicPlayer(object):
     currently_playing = None
 
     def __init__(self):
-        library = Library(config.EXPORTED_ITUNES_LIBRARY)
-        self.songs = [song for _, song in library.songs.items()]
+        import config
+
+        self.library = Library(config.EXPORTED_ITUNES_LIBRARY)
         self.artists = defaultdict(list)
+
+        # FIXME: Since we pop from both sides, we should consider using a
+        # collections.deque
         self.queue = []
+
+        # FIXME: This logic might belong in the Library class.
         for song in self.songs:
             if not song.location:
                 continue
 
-            song.location = '/' + song.location if not song.location.startswith('/') else song.location
+            song.location = '/' + song.location.lstrip('/')
             self.artists[song.artist].append(song)
+
+    @property
+    def songs(self):
+        return self.library.values()
 
     def _play(self, filename):
         try:
             output = subprocess.check_output(['mpg321', filename, '--quiet'])
         except subprocess.CalledProcessError:
             logging.debug('mpg321 killed.')
-        finally:
-            return
 
     def play_song(self, title=None, artist=None,  limit=1000):
         #FIXME: Future Functions for simplicity
@@ -115,20 +174,18 @@ class MusicPlayer(object):
 
     def play_music_as_available(self):
         while True:
-            if len(self.queue) == 0:
+            if not self.queue:
                 time.sleep(0.15)
                 continue
 
             next_song = self.queue.pop(0)
-            print('Now playing {0} by {1}'.format(next_song.name, next_song.artist))
-            if len(self.queue) > 0:
-                print('Up next: {0} by {1}'.format(self.queue[0].name, self.queue[0].artist))
+            print('Now playing {0.name} by {0.artist}'.format(next_song))
+            if self.queue:
+                print('Up next: {0.name} by {0.artist}'.format(self.queue[0]))
             self._play(next_song.location)
-        return
 
     def skip(self):
         self.stop_music()
-        return
 
     def stop_music(self):
         try:
@@ -137,10 +194,8 @@ class MusicPlayer(object):
             logging.debug("Stopping mpg321")
         except subprocess.CalledProcessError:
             pass
-        finally:
-            return
 
     def stop_all_music(self):
         self.queue = []
         self.stop_music()
-        return
+

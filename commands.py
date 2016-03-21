@@ -34,8 +34,8 @@ def _download(title, artist):
     artist = ' '.join(map(capitalize, artist.split(' ')))
     with open('../YoutubeDownloaderClient/songs.txt', 'w') as f:
         f.write('{0} --- {1}'.format(title, artist))
-    success = os.system('cd ../YoutubeDownloaderClient && python3 download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
-    if success == 0:
+    failure = os.system('cd ../YoutubeDownloaderClient && python3 download.py --file songs.txt --client-id AIzaSyDs-ONEG30OApiYc8SPNSB2uuqMb9OcX3s')
+    if not failure:
         logging.debug('Attempting to download {0} by {1} to {2}'.format(title, artist, '../YoutubeDownloader/downloads/{0} --- {1}'.format(artist, title)))
     return
 
@@ -44,44 +44,39 @@ def _download(title, artist):
 def _stop_the_music():
     global player
     player.stop_all_music()
-    return
 
 
 @locked_command
 def _play_music(title, artist):
     global player
-    success = player.play_song(title=title, artist=artist)
-    if success:
-        return True
-    return False
+    failure = player.play_song(title=title, artist=artist)
+    return bool(failure)
 
 
 @locked_command
 def _play_something_by_artist(artist):
     global player
-    success = player.play_song(artist=artist)
-    if success:
-        return True
-    return False
+    failure = player.play_song(artist=artist)
+    return bool(failure)
 
 
 @locked_command
 def _play_something_else():
     global player
-    if len(player.queue) == 0:
+
+    if player.queue:
         player.play_song(limit=3)
     else:
         player.skip()
+
     return True
 
 
 @locked_command
 def _play(title):
     global player
-    success = player.play_song(title=title, limit=5)
-    if success:
-        return True
-    return False
+    failure = player.play_song(title=title, limit=5)
+    return bool(failure)
 
 
 @locked_command
