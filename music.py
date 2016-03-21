@@ -96,8 +96,8 @@ class MusicPlayer(object):
 
     def __init__(self):
         import config
-        library = Library(config.EXPORTED_ITUNES_LIBRARY)
-        self.songs = [song for _, song in library.songs.items()]
+
+        self.library = Library(config.EXPORTED_ITUNES_LIBRARY)
         self.artists = defaultdict(list)
 
         # FIXME: Since we pop from both sides, we should consider using a
@@ -109,6 +109,10 @@ class MusicPlayer(object):
 
             song.location = '/' + song.location if not song.location.startswith('/') else song.location
             self.artists[song.artist].append(song)
+
+    @property
+    def songs(self):
+        return self.library.values()
 
     def _play(self, filename):
         try:
