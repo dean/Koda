@@ -103,11 +103,13 @@ class MusicPlayer(object):
         # FIXME: Since we pop from both sides, we should consider using a
         # collections.deque
         self.queue = []
+
+        # FIXME: This logic might belong in the Library class.
         for song in self.songs:
             if not song.location:
                 continue
 
-            song.location = '/' + song.location if not song.location.startswith('/') else song.location
+            song.location = '/' + song.location.lstrip('/')
             self.artists[song.artist].append(song)
 
     @property
